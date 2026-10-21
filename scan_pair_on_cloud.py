@@ -55,7 +55,7 @@ pair_list_mwcs = sorted({
 })
 
 # Create output directory
-output_dir = Path("../txt")
+output_dir = Path("txt")
 output_dir.mkdir(parents=True, exist_ok=True)
 
 # Save original station pairs
