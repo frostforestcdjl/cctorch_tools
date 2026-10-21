@@ -1,0 +1,73 @@
+import argparse
+import zarr
+import gcsfs
+from pathlib import Path
+
+# Parse arguments
+parser = argparse.ArgumentParser(description="Extract station pairs from GCS Zarr files")
+parser.add_argument(
+    "--project",
+    type=str,
+    required=True,
+    help="Project name, e.g., M5eq_1"
+)
+args = parser.parse_args()
+
+project = args.project
+
+# Initialize GCS
+#fs = gcsfs.GCSFileSystem()
+fs = gcsfs.GCSFileSystem(asynchronous=False, skip_instance_cache=True)
+
+gcs_path = f"gs://cctorch/ambient_noise/ccf_M5eq_run2/{project}"
+file_save = f"station_pair_{project}.txt"
+
+folder_year = fs.ls(gcs_path)
+
+pair_set = set()
+
+for year in folder_year:
+    files = fs.ls(year)
+    print(f"{len(files)} days in {year}")
+
+    for file in files:
+        print(f"Loading {file}...")
+
+        store = fs.get_mapper(f"gs://{file}")
+        z = zarr.open(store, mode="r")
+
+        id1_list = z["id1"][:]
+        id2_list = z["id2"][:]
+
+        for id1, id2 in zip(id1_list, id2_list):
+            pair_set.add(f"{id1}_{id2}")
+
+# Sort unique pairs
+pair_list = sorted(pair_set)
+
+# Convert to network.station format
+pair_list_mwcs = sorted({
+    "_".join(
+        ".".join(station.split(".")[:2])
+        for station in pair.split("_")
+    )
+    for pair in pair_list
+})
+
+# Create output directory
+output_dir = Path("../txt")
+output_dir.mkdir(parents=True, exist_ok=True)
+
+# Save original station pairs
+file_path = output_dir / file_save
+file_path.write_text("\n".join(pair_list))
+
+# Save MWCS station pairs
+file_path_mwcs = output_dir / f"station_pair_mwcs_{project}.txt"
+file_path_mwcs.write_text("\n".join(pair_list_mwcs))
+
+print(f"Original pairs: {len(pair_list)}")
+print(f"MWCS pairs: {len(pair_list_mwcs)}")
+
+print(f"Saved: {file_path.resolve()}")
+print(f"Saved: {file_path_mwcs.resolve()}")
