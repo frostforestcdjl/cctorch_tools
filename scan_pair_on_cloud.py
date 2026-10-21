@@ -21,10 +21,12 @@ fs = gcsfs.GCSFileSystem(asynchronous=False, skip_instance_cache=True)
 
 gcs_path = f"gs://cctorch/ambient_noise/ccf_M5eq_run2/{project}"
 file_save = f"station_pair_{project}.txt"
+log_save = f"station_pair_{project}_log.txt"
 
 folder_year = fs.ls(gcs_path)
 
 pair_set = set()
+error_list = []
 
 for year in folder_year:
     files = fs.ls(year)
@@ -34,13 +36,20 @@ for year in folder_year:
         print(f"Loading {file}...")
 
         store = fs.get_mapper(f"gs://{file}")
-        z = zarr.open(store, mode="r")
 
-        id1_list = z["id1"][:]
-        id2_list = z["id2"][:]
-
-        for id1, id2 in zip(id1_list, id2_list):
-            pair_set.add(f"{id1}_{id2}")
+        try:
+            z = zarr.open(store, mode="r")
+    
+            id1_list = z["id1"][:]
+            id2_list = z["id2"][:]
+    
+            for id1, id2 in zip(id1_list, id2_list):
+                pair_set.add(f"{id1}_{id2}")
+        except Exception as e:
+            error_msg = f"{file}\t{type(e).__name__}: {e}"
+            print(f"Error processing: {error_msg}")
+            error_list.append(error_msg)
+            
 
 # Sort unique pairs
 pair_list = sorted(pair_set)
@@ -58,6 +67,9 @@ pair_list_mwcs = sorted({
 output_dir = Path("txt")
 output_dir.mkdir(parents=True, exist_ok=True)
 
+output_log_dir = Path("logs")
+output_log_dir.mkdir(parents=True, exist_ok=True)
+
 # Save original station pairs
 file_path = output_dir / file_save
 file_path.write_text("\n".join(pair_list))
@@ -66,8 +78,24 @@ file_path.write_text("\n".join(pair_list))
 file_path_mwcs = output_dir / f"station_pair_mwcs_{project}.txt"
 file_path_mwcs.write_text("\n".join(pair_list_mwcs))
 
+# Save error days
+file_path_log = output_log_dir / log_save
+log_content = [
+    f"Project: {project}",
+    f"Original pairs: {len(pair_list)}",
+    f"MWCS pairs: {len(pair_list_mwcs)}",
+    f"Errors: {len(error_list)}",
+    "",
+    "Failed paths:",
+    *error_list,
+]
+file_path_log.write_text("\n".join(log_content) + "\n")
+
 print(f"Original pairs: {len(pair_list)}")
 print(f"MWCS pairs: {len(pair_list_mwcs)}")
 
 print(f"Saved: {file_path.resolve()}")
 print(f"Saved: {file_path_mwcs.resolve()}")
+
+print(f"Errors: {len(error_list)}")
+print(f"Log saved: {file_path_log.resolve()}")
