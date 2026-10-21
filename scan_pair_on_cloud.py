@@ -5,21 +5,30 @@ from pathlib import Path
 
 # Parse arguments
 parser = argparse.ArgumentParser(description="Extract station pairs from GCS Zarr files")
-parser.add_argument(
-    "--project",
-    type=str,
-    required=True,
-    help="Project name, e.g., M5eq_1"
-)
+parser.add_argument("--project_layer", type=int, choices=[0, 1], required=True, help="0: ccf_project, 1: ccf_project_folder/project")
+parser.add_argument("--project_folder", type=str, default=None, help="Project folder, e.g., M5eq_run2 (required when project_layer=1)")
+parser.add_argument("--project", type=str, required=True, help="Project name, e.g., M5eq_1")
 args = parser.parse_args()
 
+project_layer = args.project_layer
+project_folder = args.project_folder
 project = args.project
 
+# Validate arguments
+if project_layer == 1 and not project_folder:
+    parser.error("--project_folder is required when --project_layer=1")
+
 # Initialize GCS
-#fs = gcsfs.GCSFileSystem()
 fs = gcsfs.GCSFileSystem(asynchronous=False, skip_instance_cache=True)
 
-gcs_path = f"gs://cctorch/ambient_noise/ccf_M5eq_run2/{project}"
+# Construct GCS path
+if project_layer == 0:
+    gcs_path = f"gs://cctorch/ambient_noise/ccf_{project}"
+else:
+    gcs_path = f"gs://cctorch/ambient_noise/ccf_{project_folder}/{project}"
+
+print(f"GCS path: {gcs_path}")
+
 file_save = f"station_pair_{project}.txt"
 log_save = f"station_pair_{project}_log.txt"
 
