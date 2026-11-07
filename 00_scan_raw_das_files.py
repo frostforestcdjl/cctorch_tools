@@ -10,21 +10,15 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     "--token_file",
     type=str,
-    default="",
-    help="Path to Google Cloud credentials JSON file. "
-         "Default: google_default"
+    required=True,
+    help="Path to Google Cloud credentials JSON file, or 'google_default'."
 )
 
 args = parser.parse_args()
 
 # --- configure credentials ---
 token_file = args.token_file
-
-if not token_file:
-    print("No token file provided. Using default Google Cloud credentials.")
-    token_file = "google_default"
-else:
-    print(f"Using provided token file: {token_file}")
+print(f"Using credentials: {token_file}")
 
 # --- scan h5 files ---
 print("Start scan available DAS files...")
